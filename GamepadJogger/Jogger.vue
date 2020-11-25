@@ -1,9 +1,9 @@
-
 <template>
   <div>
     <div>Gamepad Name : {{gamepadName}}</div>
     <div>Active Controls : {{activeControls}}</div>
     <div>Setting Axis : {{settingAxis}}</div>
+    <v-btn @click="resetSettings" color="red">Reset</v-btn>
     <v-simple-table>
         <thead>
             <th>
@@ -46,14 +46,13 @@
     computed: {
       ...mapState('machine/model', ['move']),
     },
-    mounted() {
-      //lets build an action list from the axes
-      this.move.axes.forEach((axis) => {
-        this.actions.push({ axis: `${axis.letter}p`, control: '' });
-        this.actions.push({ axis: `${axis.letter}n`, control: '' });
-      });
-
+    created() {
+      this.loadSettings();
       setInterval(this.checkGamepad, 100);
+    },
+    mounted() {
+      //this.loadSettings();
+      //setInterval(this.checkGamepad, 100);
     },
     methods: {
       ...mapActions('machine', ['sendCode']),
@@ -70,6 +69,28 @@
         this.settingAxis = action;
         this.showSetAxis = true;
       },
+      resetSettings() {
+        this.actions = [];
+        //lets build a new  action list from the axes
+        this.move.axes.forEach((axis) => {
+          this.actions.push({ axis: `${axis.letter}p`, control: '' });
+          this.actions.push({ axis: `${axis.letter}n`, control: '' });
+        });
+      },
+      loadSettings() {
+        //Check for saved settings
+        let actionsString = localStorage.getItem('joggerSettings');
+        console.log(actionsString);
+        if (actionsString) {
+          this.actions = JSON.parse(actionsString);
+        } else {
+          this.resetSettings();
+        }
+      },
+      saveSettings() {
+        console.log(JSON.stringify(this.actions));
+        localStorage.setItem('joggerSettings', JSON.stringify(this.actions));
+      },
       async generateGCodeCommand(control) {
         if (this.moving) return; //discard any commands while moving
         this.moving = true;
@@ -80,7 +101,6 @@
           var stepDistance = `${direction}10`;
           var command = `M120\nG91\nG1 ${axis}${stepDistance}\nG90\nM121'`;
           this.moving = true;
-          console.log(command);
           await this.sendCode(command);
         }
         this.moving = false;
@@ -110,6 +130,7 @@
             this.settingAxis.control = this.activeControls[0];
             this.settingAxis = null;
             this.showSetAxis = false;
+            this.saveSettings();
           } else if (this.activeControls.length > 0) {
             //if we aren't setting then we are issuing a command
             this.generateGCodeCommand(this.activeControls[0]);
