@@ -41,18 +41,16 @@
         showSetAxis: false,
         settingAxis: null,
         moving: false,
+        debug: false,
+        stepDistance: 5,
       };
     },
     computed: {
       ...mapState('machine/model', ['move']),
     },
-    created() {
+    mounted() {
       this.loadSettings();
       setInterval(this.checkGamepad, 100);
-    },
-    mounted() {
-      //this.loadSettings();
-      //setInterval(this.checkGamepad, 100);
     },
     methods: {
       ...mapActions('machine', ['sendCode']),
@@ -91,18 +89,26 @@
         console.log(JSON.stringify(this.actions));
         localStorage.setItem('joggerSettings', JSON.stringify(this.actions));
       },
-      async generateGCodeCommand(control) {
+
+      async generateGCodeCommand(controls) {
         if (this.moving) return; //discard any commands while moving
         this.moving = true;
-        let axisAction = this.actions.filter((a) => a.control === control);
-        if (axisAction.length > 0) {
-          var axis = axisAction[0].axis[0];
-          var direction = axisAction[0].axis[1] === 'p' ? '+' : '-';
-          var stepDistance = `${direction}10`;
-          var command = `M120\nG91\nG1 ${axis}${stepDistance}\nG90\nM121'`;
-          this.moving = true;
-          await this.sendCode(command);
+        let moveCommands = '';
+        console.log(controls);
+        controls.forEach((control) => {
+          let axisActions = this.actions.filter((a) => a.control === control); //It's possibe that we may have a button set to 2 axis actions
+          axisActions.forEach((axisAction) => {
+            var axis = axisAction.axis[0];
+            var direction = axisAction.axis[1] === 'p' ? '+' : '-';
+            var move = `${direction}${this.stepDistance}`;
+            moveCommands += ` ${axis}${move}`;
+          });
+        });
+        var command = `M120\nG91\nG1 ${moveCommands.trim()}\nG90\nM121`;
+        if (this.debug) {
+          console.log(command);
         }
+        await this.sendCode(command);
         this.moving = false;
       },
       checkGamepad() {
@@ -119,7 +125,7 @@
           });
           this.activeAxes = '';
           gamepad.axes.forEach((axis, index) => {
-            if (1 - Math.abs(axis) < 0.1) {
+            if (1 - Math.abs(axis) < 0.5) {
               let sign = axis > 0 ? '+' : '-';
               this.activeControls.push(`A${index}${sign}`);
             }
@@ -133,7 +139,7 @@
             this.saveSettings();
           } else if (this.activeControls.length > 0) {
             //if we aren't setting then we are issuing a command
-            this.generateGCodeCommand(this.activeControls[0]);
+            this.generateGCodeCommand(this.activeControls);
           }
         }
       },
