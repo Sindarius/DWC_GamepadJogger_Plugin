@@ -1,14 +1,32 @@
 <template>
   <div>
     <div>Gamepad Name : {{gamepadName}}</div>
-    <v-switch v-model="enabled" label="Enable"></v-switch>
-    <v-btn @click="resetSettings" color="red">Reset</v-btn><v-btn @click="addNewItem = true">New Action</v-btn><br />
-    Steps
-    <v-btn-toggle mandatory exclusive v-model="stepDistance">
-      <v-btn v-for="step in stepAmounts" :key="step" @click="stepDistance = step" :value="step">{{step}}</v-btn>
-    </v-btn-toggle>
+    <div>
+      <v-switch inset v-model="enabled" label="Enable"></v-switch>
+    </div>
+    <v-row>
+      <v-col cols="6">
+        Steps<br />
+        <v-btn-toggle mandatory exclusive v-model="stepIndex">
+          <v-btn v-for="step in stepList" :key="step"> {{step}}</v-btn>
+        </v-btn-toggle>
+      </v-col>
+      <v-col cols="6">
+        Feed Rate (mm/s)<br />
+        <v-btn-toggle mandatory exclusive v-model="feedRateIndex">
+          <v-btn v-for="rate in feedRateList" :key="rate"> {{rate}}</v-btn>
+        </v-btn-toggle>
+      </v-col>
+    </v-row>
     <v-simple-table>
       <thead>
+        <tr>
+          <td><h2>Configuration</h2></td>
+          <td colspan="4" class="cell-right">
+            <v-btn class="mr-2" @click="addNewItem = true">New Action</v-btn>
+            <v-btn @click="showResetDialog = true" color="red">Reset</v-btn>
+          </td>
+        </tr>
         <tr>
           <th>Action</th>
           <th>Set</th>
@@ -33,20 +51,27 @@
         </tr>
       </tbody>
     </v-simple-table>
-    <v-dialog v-model="showSetAction">
+    <v-dialog v-model="showSetAction" max-width="325">
       <v-card>
         <v-card-title>Set Action</v-card-title>
         <v-card-text>Press a button or move an axis to set value</v-card-text>
         <v-card-actions> <v-btn @click="showSetAction = !showSetAction">Cancel</v-btn> </v-card-actions>
       </v-card>
     </v-dialog>
-    <v-dialog v-model="addNewItem">
+    <v-dialog v-model="showResetDialog" max-width="325">
+      <v-card max-width="325" outlined>
+        <v-card-title>Reset Settings</v-card-title>
+        <v-card-text>Click reset to confirm reset.</v-card-text>
+        <v-card-actions> <v-btn @click="resetSettings" color="red" width="150">Reset</v-btn> <v-btn color="info" @click="showResetDialog = false" width="150">Cancel</v-btn> </v-card-actions>
+      </v-card>
+    </v-dialog>
+    <v-dialog v-model="addNewItem" max-width="325">
       <v-card>
         <v-card-title>Add New Action</v-card-title>
         <v-card-text>
           <v-form>
             <v-text-field v-model="newEntry.action" label="Action Name"></v-text-field>
-            <v-text-field v-model="newEntry.command" label="Command"></v-text-field>
+            <v-textarea v-model="newEntry.command" label="Command" auto-grow filled></v-textarea>
             <v-btn @click="addCustomAction(newEntry.action, newEntry.command)">Save</v-btn>
             <v-btn @click="addNewItem = false">Close</v-btn>
           </v-form>
@@ -76,22 +101,35 @@
         showSetAction: false,
         settingAction: null,
         moving: false,
+        showResetDialog: false,
         debug: false,
-        stepAmounts: [0.1, 1, 5, 10, 25, 50, 100],
-        stepDistance: 5,
+        stepList: [0.1, 1, 5, 10, 20, 50, 100],
+        stepIndex: 2,
+        feedRateList: [1, 5, 15, 30, 60, 100],
+        feedRateIndex: 3,
         addNewItem: false,
         newEntry: {
           action: '',
           command: '',
         },
+        lastAction: 0,
       };
     },
     computed: {
-      ...mapState('machine/model', ['move']),
+      ...mapState('machine/model', ['move', 'state']),
+      stepValue() {
+        return this.stepList[this.stepIndex];
+      },
+      feedRateValue() {
+        return this.feedRateList[this.feedRateIndex] * 60;
+      },
     },
     mounted() {
       this.loadSettings();
       setInterval(this.checkGamepad, 100);
+    },
+    unmounted() {
+      clearInterval(this.checkGamepad);
     },
     methods: {
       ...mapActions('machine', ['sendCode']),
@@ -132,7 +170,10 @@
         this.actions.push(this.buildAction('Home All', commandType.gcode, 'G28'));
         this.actions.push(this.buildAction('Step +', commandType.plugin, 'step+'));
         this.actions.push(this.buildAction('Step -', commandType.plugin, 'step-'));
+        this.actions.push(this.buildAction('Feed Rate +', commandType.plugin, 'feed+'));
+        this.actions.push(this.buildAction('Feed Rate -', commandType.plugin, 'feed-'));
         this.saveSettings();
+        this.showResetDialog = false;
       },
 
       clearAction(action) {
@@ -143,7 +184,6 @@
         let actionsString = localStorage.getItem('joggerSettings');
         if (actionsString) {
           this.actions = JSON.parse(actionsString);
-          console.log(this.actions);
         } else {
           this.resetSettings();
         }
@@ -151,27 +191,24 @@
       saveSettings() {
         localStorage.setItem('joggerSettings', JSON.stringify(this.actions));
       },
-      groupBy(array, key) {
-        const result = {};
-        array.forEach((item) => {
-          if (!result[item[key]]) {
-            result[item[key]] = [];
-          }
-          result[item[key]].push(item);
-        });
-        return result;
-      },
       async generateGCodeMoveCommand(moves) {
+        /*
+          Maybe look into computing estimated time of completions for a move to smooth 
+          if (Date.now() - this.lastAction < 500) {
+            return;
+          }
+          this.lastAction = Date.now();
+          */
         if (this.moving) return; //discard any commands while moving
         this.moving = true;
         let moveCommands = '';
         moves.forEach((axisAction) => {
           var axis = axisAction.action[0];
           var direction = axisAction.action[1] === '+' ? '' : '-';
-          var move = `${direction}${this.stepDistance}`;
+          var move = `${direction}${this.stepValue}`;
           moveCommands += ` ${axis}${move}`;
         });
-        var command = `M120\nG91\nG1 ${moveCommands.trim()}\nG90\nM121`;
+        var command = `M120\nG91\nG1 ${moveCommands.trim()} F${this.feedRateValue}\nG90\nM121`;
         if (this.debug) {
           console.log(command);
         } else {
@@ -180,7 +217,7 @@
         this.moving = false;
       },
       async generateGCodeCommand(gcode) {
-        if (this.moving) {
+        if (this.moving || this.state.status !== 'idle') {
           return;
         }
         if (this.debug) {
@@ -191,8 +228,38 @@
           this.moving = false;
         }
       },
-      performPluginAction(action) {
-        console.log(action);
+      async performPluginAction(action) {
+        if (Date.now() - this.lastAction < 500) {
+          return;
+        }
+        this.lastAction = Date.now();
+
+        switch (action.command) {
+          case 'step+':
+            if (this.stepIndex < this.stepList.length - 1) {
+              this.stepIndex++;
+              await this.sendCode(`M117 "Jogger Step :  ${this.stepValue}"`);
+            }
+            break;
+          case 'step-':
+            if (this.stepIndex > 0) {
+              this.stepIndex--;
+              await this.sendCode(`M117 "Jogger Step :  ${this.stepValue}"`);
+            }
+            break;
+          case 'feed+':
+            if (this.feedRateIndex < this.feedRateList.length - 1) {
+              this.feedRateIndex++;
+              await this.sendCode(`M117 "Jogger Feed Rate :  ${this.feedRateList[this.feedRateIndex]}"`);
+            }
+            break;
+          case 'feed-':
+            {
+              if (this.feedRateIndex > 0) this.feedRateIndex--;
+              await this.sendCode(`M117 "Jogger Feed Rate :  ${this.feedRateList[this.feedRateIndex]}"`);
+            }
+            break;
+        }
       },
       checkGamepad() {
         //check if gamepads are connected and update their current button/axis states
@@ -232,6 +299,9 @@
               firedActions.push(...this.actions.filter((action) => action.control === control));
             });
             firedActions.forEach((a) => (a.pressed = true));
+            if (this.debug) {
+              console.log(firedActions);
+            }
 
             if (!this.enabled) {
               return;
@@ -243,7 +313,7 @@
               return;
             }
 
-            let gcode = firedActions.filter((act) => act.type === commandType.gcode);
+            let gcode = firedActions.filter((act) => act.type === commandType.gcode || act.type === commandType.custom);
             if (gcode.length > 0) {
               //for now we'll only allow one gcode command to be fired;
               this.generateGCodeCommand(gcode[0]);
@@ -284,5 +354,9 @@
 
   .action-pressed {
     background-color: blue;
+  }
+
+  .cell-right {
+    text-align: right;
   }
 </style>
