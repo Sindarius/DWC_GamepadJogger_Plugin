@@ -191,14 +191,14 @@
       saveSettings() {
         localStorage.setItem('joggerSettings', JSON.stringify(this.actions));
       },
-      async generateGCodeMoveCommand(moves) {
+      generateGCodeMoveCommand(moves) {
         /*
-          Maybe look into computing estimated time of completions for a move to smooth 
-          if (Date.now() - this.lastAction < 500) {
-            return;
-          }
-          this.lastAction = Date.now();
-          */
+                      Maybe look into computing estimated time of completions for a move to smooth 
+                      if (Date.now() - this.lastAction < 500) {
+                        return;
+                      }
+                      this.lastAction = Date.now();
+                      */
         if (this.moving) return; //discard any commands while moving
         this.moving = true;
         let moveCommands = '';
@@ -212,11 +212,11 @@
         if (this.debug) {
           console.log(command);
         } else {
-          await this.sendCode(command);
+          this.sendCode(command);
         }
         this.moving = false;
       },
-      async generateGCodeCommand(gcode) {
+      generateGCodeCommand(gcode) {
         if (this.moving || this.state.status !== 'idle') {
           return;
         }
@@ -224,11 +224,11 @@
           console.log(gcode.command);
         } else {
           this.moving = true;
-          await this.sendCode(gcode.command);
+          this.sendCode(gcode.command);
           this.moving = false;
         }
       },
-      async performPluginAction(action) {
+      performPluginAction(action) {
         if (Date.now() - this.lastAction < 500) {
           return;
         }
@@ -238,25 +238,25 @@
           case 'step+':
             if (this.stepIndex < this.stepList.length - 1) {
               this.stepIndex++;
-              await this.sendCode(`M117 "Jogger Step :  ${this.stepValue}"`);
+              this.sendCode(`M117 "Jogger Step :  ${this.stepValue}"`);
             }
             break;
           case 'step-':
             if (this.stepIndex > 0) {
               this.stepIndex--;
-              await this.sendCode(`M117 "Jogger Step :  ${this.stepValue}"`);
+              this.sendCode(`M117 "Jogger Step :  ${this.stepValue}"`);
             }
             break;
           case 'feed+':
             if (this.feedRateIndex < this.feedRateList.length - 1) {
               this.feedRateIndex++;
-              await this.sendCode(`M117 "Jogger Feed Rate :  ${this.feedRateList[this.feedRateIndex]}"`);
+              this.sendCode(`M117 "Jogger Feed Rate :  ${this.feedRateList[this.feedRateIndex]}"`);
             }
             break;
           case 'feed-':
             {
               if (this.feedRateIndex > 0) this.feedRateIndex--;
-              await this.sendCode(`M117 "Jogger Feed Rate :  ${this.feedRateList[this.feedRateIndex]}"`);
+              this.sendCode(`M117 "Jogger Feed Rate :  ${this.feedRateList[this.feedRateIndex]}"`);
             }
             break;
         }
@@ -306,6 +306,8 @@
             if (!this.enabled) {
               return;
             }
+
+            console.log(firedActions);
 
             let moves = firedActions.filter((act) => act.type === commandType.move);
             if (moves.length > 0) {
