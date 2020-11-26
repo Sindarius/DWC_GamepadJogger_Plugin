@@ -2,13 +2,18 @@
   <div>
     <div>Gamepad Name : {{gamepadName}}</div>
     <v-switch v-model="enabled" label="Enable"></v-switch>
-    <v-btn @click="resetSettings" color="red">Reset</v-btn>
+    <v-btn @click="resetSettings" color="red">Reset</v-btn><v-btn @click="addNewItem = true">New Action</v-btn><br />
+    Steps
+    <v-btn-toggle mandatory exclusive v-model="stepDistance">
+      <v-btn v-for="step in stepAmounts" :key="step" @click="stepDistance = step" :value="step">{{step}}</v-btn>
+    </v-btn-toggle>
     <v-simple-table>
       <thead>
         <tr>
           <th>Action</th>
           <th>Set</th>
           <th>Configure</th>
+          <th>Custom Command</th>
           <th>Controller Button Id</th>
         </tr>
       </thead>
@@ -16,7 +21,14 @@
         <tr v-for="(action,index) in actions" :key="index" class="action-control" :class="{'action-pressed' : action.pressed}">
           <td>{{action.action}}</td>
           <td>{{ isActionSet(action.control) }}</td>
-          <td><v-btn class="mr-1" @click="setActionDialog(action)">Set Action</v-btn><v-btn @click="clearAction(action)">Clear Action</v-btn></td>
+          <td>
+            <v-btn class="mr-1" @click="setActionDialog(action)" color="info">Set</v-btn>
+            <v-btn @click="clearAction(action)" color="warning" class="mr-1">Clear</v-btn>
+            <v-btn v-show="action.type === 3" @click="removeCustomAction(index)" color="error">Delete</v-btn>
+          </td>
+          <td>
+            <span v-show="action.type === 3">{{action.command}}</span>
+          </td>
           <td>{{action.control}}</td>
         </tr>
       </tbody>
@@ -25,8 +37,21 @@
       <v-card>
         <v-card-title>Set Action</v-card-title>
         <v-card-text>Press a button or move an axis to set value</v-card-text>
+        <v-card-actions> <v-btn @click="showSetAction = !showSetAction">Cancel</v-btn> </v-card-actions>
       </v-card>
-      <v-btn @click="showSetAction = !showSetAction">Cancel</v-btn>
+    </v-dialog>
+    <v-dialog v-model="addNewItem">
+      <v-card>
+        <v-card-title>Add New Action</v-card-title>
+        <v-card-text>
+          <v-form>
+            <v-text-field v-model="newEntry.action" label="Action Name"></v-text-field>
+            <v-text-field v-model="newEntry.command" label="Command"></v-text-field>
+            <v-btn @click="addCustomAction(newEntry.action, newEntry.command)">Save</v-btn>
+            <v-btn @click="addNewItem = false">Close</v-btn>
+          </v-form>
+        </v-card-text>
+      </v-card>
     </v-dialog>
   </div>
 </template>
@@ -38,6 +63,7 @@
     plugin: 0,
     gcode: 1,
     move: 2,
+    custom: 3,
   };
 
   export default {
@@ -45,14 +71,19 @@
       return {
         actions: [],
         enabled: false,
-        resetDefaults: false,
         gamepadName: '',
         activeControls: [],
         showSetAction: false,
         settingAction: null,
         moving: false,
         debug: false,
+        stepAmounts: [0.1, 1, 5, 10, 25, 50, 100],
         stepDistance: 5,
+        addNewItem: false,
+        newEntry: {
+          action: '',
+          command: '',
+        },
       };
     },
     computed: {
@@ -149,10 +180,15 @@
         this.moving = false;
       },
       async generateGCodeCommand(gcode) {
+        if (this.moving) {
+          return;
+        }
         if (this.debug) {
           console.log(gcode.command);
         } else {
+          this.moving = true;
           await this.sendCode(gcode.command);
+          this.moving = false;
         }
       },
       performPluginAction(action) {
@@ -221,6 +257,17 @@
             }
           }
         }
+      },
+      addCustomAction(action, command) {
+        this.actions.push(this.buildAction(action, commandType.custom, command));
+        this.saveSettings();
+        this.newEntry.action = '';
+        this.newEntry.command = '';
+        this.addNewItem = false;
+      },
+      removeCustomAction(index) {
+        this.actions.splice(index, 1);
+        this.saveSettings();
       },
     },
   };
