@@ -193,12 +193,12 @@
       },
       generateGCodeMoveCommand(moves) {
         /*
-                      Maybe look into computing estimated time of completions for a move to smooth 
-                      if (Date.now() - this.lastAction < 500) {
-                        return;
-                      }
-                      this.lastAction = Date.now();
-                      */
+                        Maybe look into computing estimated time of completions for a move to smooth 
+                        if (Date.now() - this.lastAction < 500) {
+                          return;
+                        }
+                        this.lastAction = Date.now();
+                        */
         if (this.moving) return; //discard any commands while moving
         this.moving = true;
         let moveCommands = '';
@@ -306,8 +306,6 @@
             if (!this.enabled) {
               return;
             }
-
-            console.log(firedActions);
 
             let moves = firedActions.filter((act) => act.type === commandType.move);
             if (moves.length > 0) {
