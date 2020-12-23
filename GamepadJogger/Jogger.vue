@@ -187,7 +187,7 @@ export default {
 			}
 		},
 		isActionSet(action) {
-			return action.control !== '' || action.key  !== '';
+			return action.control !== '' || action.key !== '';
 		},
 		buttonPressed(b) {
 			if (typeof b == 'object') {
@@ -220,9 +220,9 @@ export default {
 			this.saveSettings();
 			this.showResetDialog = false;
 		},
-
 		clearAction(action) {
 			action.control = '';
+			action.key = '';
 		},
 		loadSettings() {
 			//Check for saved settings
