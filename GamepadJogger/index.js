@@ -1,3 +1,4 @@
+'use strict'
 import { registerRoute } from '../../routes';
 import Jogger from './Jogger.vue';
 

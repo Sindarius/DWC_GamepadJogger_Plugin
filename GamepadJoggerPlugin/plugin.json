@@ -1,0 +1,9 @@
+{
+    "id": "GamepadJogger",
+    "name": "Gamepad Jogger",
+    "author": "Juan Rosario (Sindarius)",
+    "version": "1.0.0",
+    "dwcVersion": "3.4",
+    "license": "LGPL-3.0-or-later",
+    "homepage": "https://github.com/Sindarius/DWC_GamepadJogger_Plugin"
+}
