@@ -1,6 +1,9 @@
 # DWC_GamepadJogger_Plugin
 
-![Image](https://github.com/Sindarius/DWC_GamepadJogger_Plugin/blob/media/JoggerScreenshot.png?raw=true)
+![Image](https://raw.githubusercontent.com/Sindarius/DWC_GamepadJogger_Plugin/media/JoggerScreenshot.png?raw=true)
+
+
+*Update - Browsers now require a secure context (https) to use a controller so you may only be able to map keyboard keys to this plugin now.*
 
 
 This plugin will allow a user to use a gamepad to control their cnc/printer. 
